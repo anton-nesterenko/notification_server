@@ -6,7 +6,8 @@
  * Guillermo Lopez Leal <gll@tid.es>
  */
 
-var dgram = require('dgram');
+var dgram = require('dgram'),
+    log = require('../../common/logger.js');
 
 function connector_udp(data, connection) {
   this.data = data;
@@ -36,6 +37,14 @@ connector_udp.prototype = {
 
   canBeWakeup: function() {
     return true;
+  },
+
+  resetAutoclose: function() {
+    if (this.autocloseTimeout)
+      clearTimeout(this.autocloseTimeout);
+    this.autocloseTimeout = setTimeout(function() {
+      this.close();
+    }.bind(this.connection), 10000);
   },
 
   getConnection: function() {

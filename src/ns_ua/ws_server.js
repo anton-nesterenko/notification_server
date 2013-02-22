@@ -112,6 +112,17 @@ server.prototype = {
 
               // Not send the appToken
               //TODO: Not insert the appToken into the MQ
+              /**
+                {
+                  messageType: “notification”,
+                  updates: [{"channelID": "id", "version": "XXX"}, ...]
+                }
+
+                {
+                  messageType: "desktopNotification",
+                  updates: [{"channelID": "version", _internal_id: ..., "body": "body"}, ...]
+                }
+              */
               delete notification.appToken;
               delete notification.app;
               log.debug('WS::Queue::onNewMessage --> Sending messages:', notification);
@@ -296,6 +307,12 @@ server.prototype = {
           return;
         }
 
+        // Restart autoclosing timeout
+        dataManager.getNode(connection.uaid, function(nodeConnector) {
+          if(nodeConnector)
+            nodeConnector.resetAutoclose();
+        });
+
         switch (query.messageType) {
           /*
             {
@@ -362,6 +379,12 @@ server.prototype = {
             //onNodeRegistered.bind(connection));
             break;
 
+            /**
+              {
+                messageType: "register",
+                channelId: <channelId>
+              }
+             */
           case 'register':
             log.debug('WS::onWSMessage::register --> Application registration message');
 
@@ -407,9 +430,14 @@ server.prototype = {
                 log.debug('WS::onWSMessage::register --> Failing registering channelID');
               }
             });
-
             break;
 
+            /**
+              {
+                messageType: "unregister",
+                channelId: <channelId>
+              }
+             */
           case 'unregister':
             log.debug('WS::onWSMessage::unregister --> Application un-registration message');
             appToken = helpers.getAppToken(query.channelID, connection.uaid);
@@ -435,14 +463,32 @@ server.prototype = {
             });
             break;
 
+          /**
+            {
+                messageType: “ack”,
+                updates: [{"channelID": channelID, “version”: xxx}, ...]
+            }
+           */
           case 'ack':
+            // TODO: ----
             if (query.messageId) {
               dataManager.removeMessage(query.messageId, connection.uaid);
             }
-            dataManager.getNode(connection.uaid, function(nodeConnector) {
-              // If we're in a wakeupped protocol we close the connection just now
-              if (nodeConnector && nodeConnector.canBeWakeup()) {
-                connection.close();
+            break;
+
+          /**
+            {
+              messageType: “clientState”,
+              channelIDs: [{“channelID”: channelID, version: …}, …]
+            }
+           */
+          case 'clientState':
+            // TODO: Recovery method. Update channels registrations (add & remove)
+            connection.res({
+              errorcode: errorcodes.NO_ERROR,
+              extradata: {
+                messageType: 'clientState',
+                status: statuscodes.OK
               }
             });
             break;
